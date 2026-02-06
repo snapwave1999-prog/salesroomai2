@@ -11,5 +11,5 @@ export const adminClient = createClient(supabaseUrl, serviceRoleKey, {
   },
 });
 
-// (optionnel, si tu veux garder l’ancien nom dans d'autres fichiers)
+// Ajout pour satisfaire tous les imports possibles
 export const supabaseAdmin = adminClient;
