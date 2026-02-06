@@ -1,11 +1,12 @@
 // app/room2/page.tsx
-import { RoomClient } from './room-client';
+import { RoomClient, type RoomClientProps } from './room-client';
 
 export default function Room2Page() {
-  const pitchId = 1; // ou la vraie valeur que tu veux passer
+  const pitchId: RoomClientProps['pitchId'] = 1; // ou la vraie valeur
 
   return <RoomClient pitchId={pitchId} />;
 }
+
 
 
 
