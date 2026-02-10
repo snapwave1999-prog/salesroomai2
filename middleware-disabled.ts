@@ -1,7 +1,7 @@
 // middleware.ts
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 
 export async function middleware(req: NextRequest) {
   const supabase = createServerClient(
@@ -12,41 +12,26 @@ export async function middleware(req: NextRequest) {
         get(name: string) {
           return req.cookies.get(name)?.value;
         },
-        set(name: string, value: string, options: any) {
-          // Next middleware requires returning response cookies, but
-          // pour ce cas simple on n'a pas besoin d'écrire ici.
-        },
-        remove() {
-          // idem
-        },
+        set() {},
+        remove() {},
       },
     }
   );
 
-  const { data } = await supabase.auth.getUser();
-  const user = data.user;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const url = req.nextUrl;
   const pathname = url.pathname;
 
-  const isAuthPage =
-    pathname.startsWith('/login') || pathname.startsWith('/onboarding');
-
+  // On NE protège plus salesrooms ni onboarding pour l'instant
   const isProtected =
-    pathname.startsWith('/dashboard') ||
-    pathname.startsWith('/salesroom') ||
-    pathname.startsWith('/encan');
+    pathname.startsWith("/dashboard") || pathname.startsWith("/encan");
 
-  // Si pas loggé et route protégée -> login
   if (!user && isProtected) {
-    const redirectUrl = new URL('/login', req.url);
-    redirectUrl.searchParams.set('redirectTo', pathname + url.search);
-    return NextResponse.redirect(redirectUrl);
-  }
-
-  // Si loggé et sur /login -> rediriger vers /salesroom
-  if (user && pathname === '/login') {
-    const redirectUrl = new URL('/salesroom', req.url);
+    const redirectUrl = new URL("/auth/login", req.url);
+    redirectUrl.searchParams.set("redirectTo", pathname + url.search);
     return NextResponse.redirect(redirectUrl);
   }
 
@@ -54,5 +39,6 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/salesroom/:path*', '/encan/:path*', '/login', '/onboarding'],
+  matcher: ["/dashboard/:path*", "/encan/:path*"],
 };
+

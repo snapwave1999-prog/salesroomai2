@@ -1,105 +1,214 @@
 // app/salesrooms/page.tsx
-'use client';
+import { createClient } from "@/utils/supabase/server";
+import Link from "next/link";
+import { revalidatePath } from "next/cache";
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { supabase } from '@/lib/supabaseClient';
+type PlanKey = "free" | "pro" | "premium" | null;
 
-type Salesroom = {
-  id: string;
-  title: string | null;
-  subtitle: string | null;
-};
+async function getData() {
+  const supabase = createClient();
 
-export default function SalesRoomsListPage() {
-  const [rooms, setRooms] = useState<Salesroom[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
 
-  useEffect(() => {
-    async function loadRooms() {
-      setLoading(true);
-      setError(null);
+  // TEMPORAIRE : on ne redirige plus vers /auth/login pour éviter la boucle
+  if (authError || !user) {
+    console.warn("Aucun user détecté dans salesrooms (mode debug).");
+    return {
+      userId: null,
+      planKey: null,
+      rooms: [],
+    };
+  }
 
-      const { data, error } = await supabase
-        .from('salesrooms')
-        .select('id, title, subtitle')
-        .order('created_at', { ascending: false })
-        .limit(20);
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("plan_key")
+    .eq("id", user.id)
+    .single();
 
-      if (error) {
-        setError(`Erreur Supabase: ${error.message ?? 'inconnue'}`);
-      } else {
-        setRooms((data ?? []) as Salesroom[]);
-      }
+  if (profileError) {
+    console.error("Erreur chargement profil:", profileError);
+  }
 
-      setLoading(false);
-    }
+  const { data: rooms, error: roomsError } = await supabase
+    .from("salesrooms")
+    .select("id, name, affiliate_url, created_at")
+    .eq("owner_id", user.id)
+    .order("created_at", { ascending: false });
 
-    loadRooms();
-  }, []);
+  if (roomsError) {
+    console.error("Erreur chargement salesrooms:", roomsError);
+  }
+
+  return {
+    userId: user.id,
+    planKey: (profile?.plan_key as PlanKey) ?? null,
+    rooms: rooms ?? [],
+  };
+}
+
+// Action serveur pour créer une salle à partir d'un lien d’affiliation
+async function createRoomFromAffiliateLink(formData: FormData) {
+  "use server";
+
+  const supabase = createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // TEMP : si pas de user, on ne redirige pas, on arrête juste l'action
+  if (!user) {
+    console.warn(
+      "Tentative de création de salle affiliée sans user (mode debug)."
+    );
+    return;
+  }
+
+  const affiliateUrl = (formData.get("affiliate_url") as string | null)?.trim();
+
+  if (!affiliateUrl) {
+    throw new Error("Lien d’affiliation manquant.");
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("plan_key")
+    .eq("id", user.id)
+    .single();
+
+  const planKey = (profile?.plan_key as PlanKey) ?? "free";
+
+  // Règles selon le plan
+  if (planKey === "free") {
+    throw new Error(
+      "La création de salle via lien d’affiliation est réservée aux forfaits Pro et Premium."
+    );
+  }
+
+  const { count, error: countError } = await supabase
+    .from("salesrooms")
+    .select("id", { count: "exact", head: true })
+    .eq("owner_id", user.id);
+
+  if (countError) {
+    console.error("Erreur comptage salesrooms:", countError);
+    throw new Error("Erreur interne lors du comptage des salles.");
+  }
+
+  if (planKey === "pro" && (count ?? 0) >= 10) {
+    throw new Error(
+      "Limite atteinte : votre forfait Pro permet un maximum de 10 salles."
+    );
+  }
+
+  const { error: insertError } = await supabase.from("salesrooms").insert({
+    owner_id: user.id,
+    name: "Salle affiliée",
+    affiliate_url: affiliateUrl,
+  });
+
+  if (insertError) {
+    console.error("Erreur création salle affiliée:", insertError);
+    throw new Error("Erreur lors de la création de la salle.");
+  }
+
+  revalidatePath("/salesrooms");
+}
+
+export default async function SalesroomsPage() {
+  const { planKey, rooms } = await getData();
 
   return (
-    <main className="min-h-screen p-6 bg-slate-100">
-      <div className="max-w-3xl mx-auto space-y-6">
-        <h1 className="text-3xl font-bold text-slate-900">SalesRooms</h1>
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold">Mes SalesRooms</h1>
 
-        {loading && <p className="text-slate-700">Chargement des salles...</p>}
+      {/* Info sur le plan */}
+      <div className="text-sm text-gray-600">
+        Plan actuel : <strong>{planKey ?? "free"}</strong>
+      </div>
 
-        {error && !loading && (
-          <p className="text-red-600 whitespace-pre-wrap">{error}</p>
-        )}
+      {/* Formulaire : créer une salle via lien d’affiliation */}
+      <form action={createRoomFromAffiliateLink} className="space-y-3">
+        <label className="block text-sm font-medium">
+          Lien d’affiliation
+          <input
+            type="url"
+            name="affiliate_url"
+            placeholder="https://..."
+            className="mt-1 w-full border rounded px-3 py-2 text-sm"
+            required
+          />
+        </label>
 
-        {!loading && rooms.length === 0 && !error && (
-          <p className="text-slate-700">
-            Aucune salle pour l&apos;instant.
+        {planKey === "free" ? (
+          <p className="text-xs text-red-600">
+            La création via lien d’affiliation est réservée aux forfaits Pro et
+            Premium.
+          </p>
+        ) : planKey === "pro" ? (
+          <p className="text-xs text-gray-600">
+            Forfait Pro : maximum 10 salles au total (manuelles + affiliées).
+          </p>
+        ) : (
+          <p className="text-xs text-gray-600">
+            Forfait Premium : salles illimitées.
           </p>
         )}
 
-        <div className="grid gap-4">
-          {rooms.map((room) => {
-            const params = new URLSearchParams({
-              salesroomId: room.id,
-              title: room.title ?? '',
-              subtitle: room.subtitle ?? '',
-            });
+        <button
+          type="submit"
+          className="px-4 py-2 text-sm rounded bg-blue-600 text-white disabled:bg-gray-400"
+          disabled={planKey === "free"}
+        >
+          Créer une salle à partir du lien
+        </button>
+      </form>
 
-            return (
-              <div
-                key={room.id}
-                className="border rounded-lg bg-white shadow-sm p-4 flex flex-col gap-2"
-              >
-                <h2 className="text-lg font-semibold text-slate-900">
-                  {room.title ?? 'Salle sans titre'}
-                </h2>
-                {room.subtitle && (
-                  <p className="text-sm text-slate-700">
-                    {room.subtitle}
-                  </p>
-                )}
-                <p className="text-xs text-slate-500 break-all">
-                  ID : {room.id}
-                </p>
-
-                <div className="flex gap-3 mt-2">
-                  <Link
-                    href={`/salesroom?${params.toString()}`}
-                    className="px-3 py-1.5 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
-                  >
-                    Ouvrir la salle
-                  </Link>
-                  <Link
-                    href={`/salesroom-avatar?${params.toString()}`}
-                    className="px-3 py-1.5 rounded bg-emerald-600 text-white text-sm hover:bg-emerald-700"
-                  >
-                    Ouvrir l&apos;avatar
-                  </Link>
+      {/* Liste des salles existantes */}
+      <div className="space-y-2">
+        {rooms.length === 0 ? (
+          <p className="text-sm text-gray-500">
+            Vous n’avez pas encore de SalesRoom.
+          </p>
+        ) : (
+          rooms.map((room: any) => (
+            <div
+              key={room.id}
+              className="border rounded px-3 py-2 flex flex-col gap-1"
+            >
+              <div className="font-medium text-sm">{room.name}</div>
+              {room.affiliate_url && (
+                <div className="text-xs text-gray-600 break-all">
+                  Lien affilié : {room.affiliate_url}
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              )}
+            </div>
+          ))
+        )}
       </div>
-    </main>
+
+      <div>
+        <Link
+          href="/salesrooms/new"
+          className="text-sm text-blue-600 underline"
+        >
+          Créer une salle manuellement
+        </Link>
+      </div>
+    </div>
   );
 }
+
+
+
+
+
+
+
+
+
+

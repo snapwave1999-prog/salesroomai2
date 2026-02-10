@@ -1,10 +1,17 @@
-// app/room/room-client.tsx
-// Temporairement inutilisé avec la version simple de /room.
-// On garde un composant neutre pour éviter les erreurs d'import.
+'use client';
 
-export default function RoomClient() {
-  return null;
+export type RoomClientProps = {
+  pitchId: number;
+};
+
+export function RoomClient({ pitchId }: RoomClientProps) {
+  return (
+    <div>
+      <p>Room client pour le pitch #{pitchId}</p>
+    </div>
+  );
 }
+
 
 
 

@@ -1,22 +1,29 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import SalesroomAvatar from "@/components/SalesroomAvatar";
 
 export default function SalesroomAvatarInner() {
   const searchParams = useSearchParams();
-
   const roomId = searchParams.get("roomId");
   const token = searchParams.get("token");
 
+  if (!roomId || !token) {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <div>
+          <h1 className="text-xl font-bold mb-2">Salesroom Avatar</h1>
+        <p>Paramètres manquants (roomId ou token).</p>
+        </div>
+      </main>
+    );
+  }
+
   return (
-    <main className="min-h-screen flex items-center justify-center">
-      <div>
-        <h1>Salesroom Avatar</h1>
-        <p>roomId: {roomId ?? "none"}</p>
-        <p>token: {token ?? "none"}</p>
-        {/* ici tu colles ensuite ton ancien UI/avatar */}
-      </div>
+    <main className="min-h-screen">
+      <SalesroomAvatar roomId={roomId} token={token} />
     </main>
   );
 }
+
 

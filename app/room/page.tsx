@@ -5,50 +5,47 @@ import Link from "next/link";
 
 type Room = {
   id: string;
-  name: string;
+  name?: string;
   access_token?: string;
   token?: string;
 };
 
-export default function Room2Page() {
+export default function RoomClientPage() {
   const [room, setRoom] = useState<Room | null>(null);
 
   useEffect(() => {
-    // Exemple: récupère la room actuelle depuis ton API
-    // Tu peux adapter l'URL / la logique à ton backend existant
     const loadRoom = async () => {
       try {
         const res = await fetch("/api/room2-data");
         if (!res.ok) {
-          console.error("Erreur chargement room2", res.status);
+          console.error("Erreur chargement room", res.status);
           return;
         }
         const data = await res.json();
         setRoom(data.room);
       } catch (err) {
-        console.error("Erreur fetch room2", err);
+        console.error("Erreur fetch room", err);
       }
     };
 
     loadRoom();
   }, []);
 
-  const token =
-    room?.access_token ?? room?.token ?? "";
+  const token = room?.access_token ?? room?.token ?? "";
 
   return (
     <main className="min-h-screen p-6">
-      <h1 className="text-2xl font-bold mb-4">Room 2</h1>
+      <h1 className="text-2xl font-bold mb-4">
+        Room client pour le pitch #1
+      </h1>
 
-      {!room && (
-        <p>Chargement de la salle...</p>
-      )}
+      {!room && <p>Chargement de la salle...</p>}
 
       {room && (
         <div className="space-y-4">
           <div>
             <p>ID de la room : {room.id}</p>
-            <p>Nom : {room.name}</p>
+            {room.name && <p>Nom : {room.name}</p>}
           </div>
 
           <div>
@@ -64,6 +61,38 @@ export default function Room2Page() {
     </main>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

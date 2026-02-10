@@ -1,64 +1,57 @@
 // app/api/stripe/checkout/route.ts
-import { NextRequest, NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe'
-import { createClient } from '@/utils/supabase/server'
+import { NextRequest, NextResponse } from "next/server";
+import Stripe from "stripe";
+
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY as string;
+
+const stripe = new Stripe(stripeSecretKey, {
+  apiVersion: "2026-01-28.clover",
+});
+
+// En dev on force localhost:3000 pour éviter les soucis de variables.
+const LOCAL_SITE_URL = "http://localhost:3000";
+
+const PRICE_IDS: Record<string, string> = {
+  pro: "price_1SvilrDkjSHw910oRKfKk0oD",
+  premium: "price_1SvisODkjSHw910ohkyMreRk",
+};
 
 export async function POST(req: NextRequest) {
   try {
-    const { plan } = await req.json()
+    const body = await req.json();
+    const planKey = body.planKey as string | undefined;
 
-    if (!plan || !['pro', 'premium'].includes(plan)) {
-      return NextResponse.json({ error: 'Plan invalide' }, { status: 400 })
-    }
-
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser()
-
-    if (error || !user) {
-      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
-    }
-
-    const priceId =
-      plan === 'pro'
-        ? process.env.STRIPE_PRICE_PRO
-        : process.env.STRIPE_PRICE_PREMIUM
-
-    if (!priceId) {
+    if (!planKey || !PRICE_IDS[planKey]) {
       return NextResponse.json(
-        { error: 'Price ID non configuré' },
-        { status: 500 },
-      )
+        { error: "Plan invalide" },
+        { status: 400 }
+      );
     }
 
-    const origin = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const priceId = PRICE_IDS[planKey];
 
     const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      payment_method_types: ['card'],
+      mode: "subscription",
       line_items: [
         {
           price: priceId,
           quantity: 1,
         },
       ],
-      success_url: `${origin}/dashboard?checkout=success`,
-      cancel_url: `${origin}/plans?checkout=cancel`,
-      customer_email: user.email || undefined,
-      metadata: {
-        user_id: user.id,
-        plan,
-      },
-    })
+      success_url: `${LOCAL_SITE_URL}/salesrooms?checkout=success&plan=${planKey}`,
+      cancel_url: `${LOCAL_SITE_URL}/onboarding/plan?checkout=cancel`,
+      allow_promotion_codes: true,
+    });
 
-    return NextResponse.json({ url: session.url })
-  } catch (err: any) {
-    console.error('Erreur Stripe Checkout:', err)
+    return NextResponse.json({ url: session.url });
+  } catch (error) {
+    console.error("Erreur création session Stripe:", error);
     return NextResponse.json(
-      { error: err.message || 'Erreur serveur' },
-      { status: 500 },
-    )
+      { error: "Erreur Stripe" },
+      { status: 500 }
+    );
   }
 }
+
+
+

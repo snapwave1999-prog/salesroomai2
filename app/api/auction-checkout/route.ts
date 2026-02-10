@@ -1,147 +1,115 @@
-import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
-import { createClient } from '@supabase/supabase-js';
+// app/api/auction-checkout/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { stripe } from "@/lib/stripe";
+import { supabaseAdmin } from "@/utils/supabase/admin";
 
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!stripeSecretKey) {
-  console.error(
-    'STRIPE_SECRET_KEY manquant pour /api/auction-checkout. Ajoute-le dans .env.local.'
-  );
-}
-
-if (!supabaseUrl || !serviceRoleKey) {
-  console.error(
-    'Env manquantes pour /api/auction-checkout : NEXT_PUBLIC_SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY.'
-  );
-}
-
-// Stripe initialisé avec la bonne apiVersion
-const stripe = stripeSecretKey
-  ? new Stripe(stripeSecretKey, {
-      apiVersion: '2026-01-28.clover',
-    })
-  : null;
-
-function getAdminSupabase() {
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error(
-      'Supabase admin non configuré : vérifiez NEXT_PUBLIC_SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY.'
-    );
-  }
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false },
-  });
-}
-
-export const runtime = 'nodejs';
+const BASE_URL =
+  process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
 export async function POST(req: NextRequest) {
   try {
-    if (!stripe) {
-      return NextResponse.json(
-        { error: 'Stripe non configuré côté serveur.' },
-        { status: 500 }
-      );
-    }
-
     const body = await req.json().catch(() => null);
+    const { auctionId } = body || {};
 
-    if (
-      !body ||
-      typeof body.auction_order_id !== 'string' ||
-      !body.auction_order_id.trim()
-    ) {
+    if (!auctionId || typeof auctionId !== "string") {
       return NextResponse.json(
-        { error: 'Champ "auction_order_id" requis dans le body.' },
+        { error: "auctionId manquant ou invalide" },
         { status: 400 }
       );
     }
 
-    const orderId = body.auction_order_id.trim();
-    const origin = req.headers.get('origin') || 'http://localhost:3000';
-
-    const supabase = getAdminSupabase();
-
-    // 1) Récupérer l'ordre d'encan
-    const { data: order, error: orderError } = await supabase
-      .from('auction_orders')
-      .select(
-        'id, auction_id, salesroom_id, winner_name, winner_bid_amount, status'
-      )
-      .eq('id', orderId)
+    // 1) Charger l'encan (id réel = colonne demo)
+    const { data: auctionRow, error: auctionError } = await supabaseAdmin
+      .from("auctions")
+      .select("demo, salesroom_id, status, start_price, winning_amount")
+      .eq("demo", auctionId)
       .maybeSingle();
 
-    if (orderError) {
-      console.error('Erreur lecture auction_orders:', orderError);
+    if (auctionError) {
+      console.error("[auction-checkout] Error loading auction:", auctionError);
       return NextResponse.json(
-        { error: 'Erreur lecture auction_orders.' },
+        { error: "Erreur lecture encan" },
         { status: 500 }
       );
     }
 
-    if (!order) {
+    if (!auctionRow) {
       return NextResponse.json(
-        { error: 'Ordre introuvable.' },
+        { error: "Encan introuvable pour cet auctionId (demo)." },
         { status: 404 }
       );
     }
 
-    if (order.status !== 'pending_payment') {
+    // 2) Charger la SalesRoom liée (sans currency)
+    const { data: salesroomRow, error: salesroomError } = await supabaseAdmin
+      .from("salesrooms")
+      .select("id, title")
+      .eq("id", auctionRow.salesroom_id)
+      .maybeSingle();
+
+    if (salesroomError) {
+      console.error(
+        "[auction-checkout] Error loading salesroom:",
+        salesroomError
+      );
       return NextResponse.json(
-        {
-          error:
-            'Cet ordre n’est pas en statut pending_payment, impossible de créer un paiement.',
-        },
+        { error: "Erreur lecture SalesRoom" },
+        { status: 500 }
+      );
+    }
+
+    if (!salesroomRow) {
+      return NextResponse.json(
+        { error: "SalesRoom liée introuvable." },
+        { status: 404 }
+      );
+    }
+
+    // 3) Montant à facturer (winning_amount prioritaire si présent)
+    const amount =
+      auctionRow.winning_amount && auctionRow.winning_amount > 0
+        ? auctionRow.winning_amount
+        : auctionRow.start_price;
+
+    if (!amount || amount <= 0) {
+      return NextResponse.json(
+        { error: "Montant invalide pour cet encan" },
         { status: 400 }
       );
     }
 
-    const amountNumber = Number(order.winner_bid_amount);
-    if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
-      return NextResponse.json(
-        { error: 'Montant gagnant invalide pour cet ordre.' },
-        { status: 400 }
-      );
-    }
+    // Devise forcée (car pas de colonne currency)
+    const currency = "cad";
 
-    const amountInCents = Math.round(amountNumber * 100);
-
-    // 2) Créer la Checkout Session Stripe (paiement one-shot)
+    // 4) Création de la session Stripe Checkout
     const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      payment_method_types: ['card'],
+      mode: "payment",
       line_items: [
         {
           price_data: {
-            currency: 'cad',
+            currency,
             product_data: {
-              name: `Paiement encan #${order.auction_id}`,
-              description: order.winner_name
-                ? `Gagnant: ${order.winner_name}`
-                : 'Paiement gagnant encan',
+              name: salesroomRow.title || "Encan SalesRoomAI",
             },
-            unit_amount: amountInCents,
+            unit_amount: Math.round(amount * 100),
           },
           quantity: 1,
         },
       ],
-      client_reference_id: order.id,
-      success_url: `${origin}/salesroom/payment-success?orderId=${
-        order.id
-      }&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/salesroom/payment-cancelled?orderId=${order.id}`,
-    }); // [web:619]
+      success_url: `${BASE_URL}/salesroom/payment-success?auctionId=${auctionId}`,
+      cancel_url: `${BASE_URL}/salesroom?salesroomId=${salesroomRow.id}`,
+    });
 
-    return NextResponse.json({ url: session.url }, { status: 200 });
-  } catch (err: any) {
-    console.error('Erreur /api/auction-checkout:', err);
+    return NextResponse.json({ url: session.url });
+  } catch (err) {
+    console.error("[auction-checkout] Unexpected error:", err);
     return NextResponse.json(
-      { error: err?.message || 'Erreur interne /api/auction-checkout.' },
+      { error: "Erreur serveur pendant la création de la session Stripe" },
       { status: 500 }
     );
   }
 }
+
+
+
 
