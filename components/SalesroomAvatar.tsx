@@ -68,3 +68,4 @@ export default function SalesroomAvatar({ roomId, token }: SalesroomAvatarProps)
     </div>
   );
 }
+
