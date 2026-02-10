@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import SalesroomAvatar from "@/components/SalesroomAvatar";
+import SalesroomAvatar from "../../components/SalesroomAvatar";
 
 export default function SalesroomAvatarInner() {
   const searchParams = useSearchParams();
@@ -13,7 +13,7 @@ export default function SalesroomAvatarInner() {
       <main className="min-h-screen flex items-center justify-center">
         <div>
           <h1 className="text-xl font-bold mb-2">Salesroom Avatar</h1>
-        <p>Paramètres manquants (roomId ou token).</p>
+          <p>Paramètres manquants (roomId ou token).</p>
         </div>
       </main>
     );
@@ -25,5 +25,6 @@ export default function SalesroomAvatarInner() {
     </main>
   );
 }
+
 
 
