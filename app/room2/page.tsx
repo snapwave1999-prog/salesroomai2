@@ -1,9 +1,11 @@
+// app/room2/page.tsx
 "use client";
 
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import SalesroomAvatar from "../../components/SalesroomAvatar";
 
-export default function Room2Page() {
+function Room2Inner() {
   const searchParams = useSearchParams();
   const roomId = searchParams.get("roomId");
   const token = searchParams.get("token");
@@ -25,6 +27,21 @@ export default function Room2Page() {
     </main>
   );
 }
+
+export default function Room2Page() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen flex items-center justify-center">
+          <p className="text-slate-200">Chargement de la salle...</p>
+        </main>
+      }
+    >
+      <Room2Inner />
+    </Suspense>
+  );
+}
+
 
 
 
