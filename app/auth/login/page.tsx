@@ -3,178 +3,110 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabaseBrowser } from "@/lib/supabase-browser";
+import { createBrowserSupabaseClient } from "@/lib/supabase-browser";
 
 type Mode = "login" | "signup";
 
-export default function AuthPage() {
+export default function AuthLoginPage() {
   const router = useRouter();
-  const supabase = supabaseBrowser;
-
+  const [supabase] = useState(() => createBrowserSupabaseClient());
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [infoMsg, setInfoMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setErrorMsg(null);
-    setInfoMsg(null);
+    setError(null);
 
     try {
       if (mode === "login") {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
-
-        if (error) {
-          console.error("Erreur login:", error);
-          setErrorMsg(error.message);
-          setLoading(false);
-          return;
-        }
-
-        console.log("Connecté:", data.user?.id);
-        // On repart dans le flow d'onboarding
-        router.push("/onboarding");
-        return;
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (error) throw error;
       }
 
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      if (error) {
-        console.error("Erreur signup:", error);
-        setErrorMsg(error.message);
-        setLoading(false);
-        return;
-      }
-
-      console.log("Inscription:", data.user?.id);
-
-      setInfoMsg(
-        "Compte créé. Si la confirmation d’email est activée dans Supabase, vérifie ta boîte mail avant de te connecter."
-      );
-    } catch (err) {
-      console.error("Erreur inattendue auth:", err);
-      setErrorMsg("Erreur inattendue, réessaie.");
+      router.push("/onboarding");
+    } catch (err: any) {
+      setError(err.message ?? "Une erreur est survenue.");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-slate-900/80 border border-slate-800 rounded-2xl p-6 space-y-4">
-        <div className="flex justify-center gap-4 text-sm">
-          <button
-            type="button"
-            onClick={() => {
-              setMode("login");
-              setErrorMsg(null);
-              setInfoMsg(null);
-            }}
-            className={`pb-1 border-b-2 ${
-              mode === "login"
-                ? "border-emerald-500 text-white"
-                : "border-transparent text-slate-500"
-            }`}
-          >
-            Se connecter
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode("signup");
-              setErrorMsg(null);
-              setInfoMsg(null);
-            }}
-            className={`pb-1 border-b-2 ${
-              mode === "signup"
-                ? "border-emerald-500 text-white"
-                : "border-transparent text-slate-500"
-            }`}
-          >
-            Créer un compte
-          </button>
-        </div>
-
+      <div className="w-full max-w-md space-y-6 bg-slate-900/80 border border-slate-800 rounded-2xl p-6">
         <h1 className="text-xl font-bold text-white text-center">
-          {mode === "login" ? "Connexion" : "Inscription"}
+          {mode === "login" ? "Connexion" : "Créer un compte"}
         </h1>
-        <p className="text-xs text-slate-400 text-center">
-          {mode === "login"
-            ? "Connecte-toi pour gérer tes SalesRooms et tes encans."
-            : "Crée ton compte pour lancer tes premières ventes et encans."}
-        </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
-            <label className="block text-xs text-slate-300">Email</label>
+            <label className="text-xs text-slate-300">Email</label>
             <input
               type="email"
               required
+              className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-50"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              placeholder="vous@example.com"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="block text-xs text-slate-300">
-              Mot de passe
-            </label>
+            <label className="text-xs text-slate-300">Mot de passe</label>
             <input
               type="password"
               required
+              className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-50"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              placeholder="Votre mot de passe"
             />
           </div>
 
-          {errorMsg && (
-            <p className="text-xs text-red-400 whitespace-pre-line">
-              {errorMsg}
-            </p>
-          )}
-
-          {infoMsg && (
-            <p className="text-xs text-emerald-300 whitespace-pre-line">
-              {infoMsg}
-            </p>
+          {error && (
+            <p className="text-xs text-red-400 text-center">{error}</p>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className={`w-full rounded-md px-4 py-2 text-sm font-semibold text-white ${
-              loading
-                ? "bg-slate-600 cursor-not-allowed"
-                : "bg-emerald-600 hover:bg-emerald-500"
-            }`}
+            className="w-full rounded-md bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
           >
             {loading
-              ? mode === "login"
-                ? "Connexion..."
-                : "Création du compte..."
+              ? "Traitement..."
               : mode === "login"
               ? "Se connecter"
               : "Créer mon compte"}
           </button>
         </form>
+
+        <button
+          type="button"
+          onClick={() =>
+            setMode((m) => (m === "login" ? "signup" : "login"))
+          }
+          className="w-full text-xs text-slate-300 underline underline-offset-4"
+        >
+          {mode === "login"
+            ? "Pas encore de compte ? Créer un compte"
+            : "Déjà un compte ? Se connecter"}
+        </button>
       </div>
     </main>
   );
 }
+
 
 
 

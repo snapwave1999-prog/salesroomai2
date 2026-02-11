@@ -1,12 +1,13 @@
+// app/onboarding/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabaseBrowser } from "@/lib/supabase-browser";
+import { createBrowserSupabaseClient } from "@/lib/supabase-browser";
 
 export default function OnboardingEntryPage() {
-  const supabase = supabaseBrowser;
   const router = useRouter();
+  const [supabase] = useState(() => createBrowserSupabaseClient());
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
@@ -61,6 +62,7 @@ export default function OnboardingEntryPage() {
 
   return null;
 }
+
 
 
 
