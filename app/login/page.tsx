@@ -1,130 +1,96 @@
 // app/login/page.tsx
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { createBrowserSupabaseClient } from '@/utils/supabase/browser';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function LoginPage() {
   const router = useRouter();
-  const supabase = createBrowserSupabaseClient();
-
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    setErrorMsg(null);
+    setError(null);
+    setLoading(true);
 
-    if (!email || !password) {
-      setErrorMsg('Email et mot de passe requis.');
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    setLoading(false);
+
+    if (error) {
+      setError(error.message);
       return;
     }
 
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        console.error('Erreur login:', error);
-        setErrorMsg('Email ou mot de passe invalide.');
-        return;
-      }
-
-      // Succès : on redirige vers la page demandée ou vers /salesroom
-      const params = new URLSearchParams(window.location.search);
-      const redirectTo = params.get('redirectTo') || '/salesroom';
-      router.push(redirectTo);
-    } catch (err) {
-      console.error('Erreur réseau login:', err);
-      setErrorMsg('Erreur réseau.');
-    } finally {
-      setLoading(false);
+    if (data.session) {
+      router.push("/");
     }
-  };
+  }
 
   return (
-    <main
-      style={{
-        maxWidth: 400,
-        margin: '0 auto',
-        padding: 24,
-        color: 'white',
-      }}
-    >
-      <h1 style={{ fontSize: 26, marginBottom: 16 }}>Connexion</h1>
+    <main className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center px-4">
+      <div className="w-full max-w-md bg-slate-900/80 border border-slate-800 rounded-2xl p-6 space-y-4">
+        <h1 className="text-xl font-bold text-white text-center">
+          Connexion
+        </h1>
+        <p className="text-xs text-slate-400 text-center">
+          Connectez-vous pour accéder à votre SalesRoom.
+        </p>
 
-      <form
-        onSubmit={handleSubmit}
-        style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <label htmlFor="email">Email</label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={{
-              padding: 8,
-              borderRadius: 4,
-              border: '1px solid #475569',
-              backgroundColor: '#020617',
-              color: 'white',
-            }}
-          />
-        </div>
+        <form onSubmit={handleLogin} className="space-y-3">
+          <div className="space-y-1 text-sm">
+            <label className="block text-slate-200">Email</label>
+            <input
+              type="email"
+              className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <label htmlFor="password">Mot de passe</label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{
-              padding: 8,
-              borderRadius: 4,
-              border: '1px solid #475569',
-              backgroundColor: '#020617',
-              color: 'white',
-            }}
-          />
-        </div>
+          <div className="space-y-1 text-sm">
+            <label className="block text-slate-200">Mot de passe</label>
+            <input
+              type="password"
+              className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
 
-        {errorMsg && (
-          <p style={{ color: '#f97316', fontSize: 14 }}>{errorMsg}</p>
-        )}
+          {error && (
+            <p className="text-xs text-red-400">
+              {error}
+            </p>
+          )}
 
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            marginTop: 8,
-            padding: '8px 12px',
-            borderRadius: 4,
-            border: 'none',
-            backgroundColor: '#3b82f6',
-            color: 'white',
-            cursor: 'pointer',
-            opacity: loading ? 0.7 : 1,
-          }}
-        >
-          {loading ? 'Connexion...' : 'Se connecter'}
-        </button>
-      </form>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-md px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60"
+          >
+            {loading ? "Connexion..." : "Se connecter"}
+          </button>
+        </form>
+      </div>
     </main>
   );
 }
+
 
 
 
