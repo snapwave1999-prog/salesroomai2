@@ -1,29 +1,29 @@
-// app/payment-cancelled/page.tsx
-"use client";
 
-import { useSearchParams, useRouter } from "next/navigation";
+
+// app/payment-cancelled/page.tsx
+
+export const dynamic = "force-static";
 
 export default function PaymentCancelledPage() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const pitchId = searchParams.get("pitchId");
-
   return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-100">
-      <div className="bg-white shadow rounded-lg p-8 max-w-md w-full text-center space-y-4">
-        <h1 className="text-2xl font-bold text-slate-900">
+    <main className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center px-4">
+      <div className="w-full max-w-md bg-slate-900/80 border border-slate-800 rounded-2xl p-6 space-y-4 text-center">
+        <h1 className="text-xl font-bold text-white">
           Paiement annulé
         </h1>
-        <p className="text-sm text-slate-700">
-          Le paiement{pitchId ? <> pour le pitch #{pitchId}</> : null} a été annulé.
-          Vous pouvez réessayer plus tard.
+        <p className="text-sm text-slate-300">
+          Le paiement a été annulé ou n&apos;a pas pu être complété.
         </p>
-        <button
-          onClick={() => router.push("/salesroom-avatar")}
-          className="mt-4 px-4 py-2 rounded bg-slate-700 text-white text-sm font-semibold hover:bg-slate-800"
+        <p className="text-xs text-slate-400">
+          Si vous pensez que c&apos;est une erreur, vous pouvez réessayer le paiement
+          depuis votre SalesRoom ou contacter le support.
+        </p>
+        <a
+          href="/"
+          className="inline-block mt-4 rounded-md px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500"
         >
-          Retour à l'avatar
-        </button>
+          Retour à l&apos;accueil
+        </a>
       </div>
     </main>
   );

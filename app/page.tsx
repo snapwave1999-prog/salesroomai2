@@ -10,10 +10,10 @@ export default function HomePage() {
     <main className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center px-4">
       <div className="w-full max-w-md bg-slate-900/80 border border-slate-800 rounded-2xl p-6 space-y-4">
         <h1 className="text-xl font-bold text-white text-center">
-          SalesRoomAI – Encan de test
+          SalesRoomAI – Démo
         </h1>
         <p className="text-xs text-slate-400 text-center">
-          Choisissez une option pour accéder aux encans.
+          Choisissez une option pour accéder à votre SalesRoom ou à l&apos;encan de test.
         </p>
 
         <div className="space-y-3">
@@ -35,16 +35,17 @@ export default function HomePage() {
 
           <button
             type="button"
-            onClick={() => router.push("/room")}
+            onClick={() => router.push("/salesroom-avatar")}
             className="w-full rounded-md px-4 py-2 text-[11px] font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700"
           >
-            Voir la room de test
+            Ouvrir la SalesRoom avatar (démo Camaro)
           </button>
         </div>
       </div>
     </main>
   );
 }
+
 
 
 

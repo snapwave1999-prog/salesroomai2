@@ -7,17 +7,12 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// On force la room de test à utiliser le pitch id = 10
+const TEST_PITCH_ID = 10;
+
 export async function GET(req: NextRequest) {
   try {
-    const pitchIdParam = req.nextUrl.searchParams.get('pitchId');
-    const pitchId = pitchIdParam ? Number(pitchIdParam) : null;
-
-    if (!pitchId || Number.isNaN(pitchId)) {
-      return NextResponse.json(
-        { ok: false, message: 'pitchId manquant ou invalide.' },
-        { status: 400 }
-      );
-    }
+    const pitchId = TEST_PITCH_ID;
 
     // 1) Récupérer le pitch
     const { data: pitch, error: pitchError } = await supabase
@@ -30,14 +25,14 @@ export async function GET(req: NextRequest) {
       console.error('Erreur Supabase pitch:', pitchError);
       return NextResponse.json(
         { ok: false, message: 'Encan introuvable.' },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     // 2) Récupérer les offres (sans phone_number)
     const { data: offers, error: offersError } = await supabase
       .from('offers')
-      .select('id, amount, created_at') // <-- colonne phone_number retirée
+      .select('id, amount, created_at')
       .eq('pitch_id', pitchId)
       .order('created_at', { ascending: false });
 
@@ -45,21 +40,23 @@ export async function GET(req: NextRequest) {
       console.error('Erreur Supabase offers:', offersError);
       return NextResponse.json(
         { ok: false, message: 'Erreur lors du chargement des offres.' },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     return NextResponse.json(
       { ok: true, pitch, offers: offers || [] },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (err) {
     console.error('Erreur réseau /api/room2-data:', err);
     return NextResponse.json(
       { ok: false, message: 'Erreur serveur lors du chargement de la salle.' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
+
+
 
 
